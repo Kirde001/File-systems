@@ -2,7 +2,7 @@ import struct
 import os
 import sys
 
-FILENAME = "disk_3.img" # УКАЖИ ЗДЕСЬ ИМЯ ТВОЕГО ФАЙЛА-ОБРАЗА С EXT4
+FILENAME = "disk_3.img" 
 
 def format_hex_dump(data, start_address, length=128):
     res = ""
@@ -41,7 +41,6 @@ class Ext4DetailedAnalyzer:
         
         self.analyze_superblock()
         
-        # Подготовка папки для восстановления файлов
         vol_clean = "".join(c for c in self.s_volume_name if c.isalnum() or c in (' ', '_', '-')).strip()
         self.extract_base_dir = vol_clean if vol_clean else "EXT4_Recovered"
         os.makedirs(self.extract_base_dir, exist_ok=True)
@@ -310,7 +309,6 @@ class Ext4DetailedAnalyzer:
                     self.extract_file(target_inode, i_size_lo, logical_path, name)
                 else:
                     self.total_dirs += 1
-                    # --- ИЗМЕНЕНИЕ ЗДЕСЬ: Принудительно создаем пустую папку на диске ---
                     empty_dir_path = os.path.join(self.extract_base_dir, logical_path.strip('/').replace('/', os.sep), name)
                     os.makedirs(empty_dir_path, exist_ok=True)
 

@@ -3,10 +3,8 @@ import math
 import os
 import sys
 
-# === НАСТРОЙКИ ===
-FILENAME = "fat16_variant_02.img"   # Поменяй на disk_2.vhd или disk_test.vhd для проверки
-VHD_OFFSET = 0x00000         # Смещение загрузочного сектора (стандартно 65536)
-# =================
+FILENAME = "fat16_variant_02.img"   
+VHD_OFFSET = 0x00000         
 
 def decode_dos_time(val):
     sec = (val & 0x1F) * 2
@@ -39,10 +37,7 @@ class FATAnalyzer:
         self.f = open(filepath, 'rb')
         self.offset = offset
         self.f.seek(self.offset)
-        
-        # --- 1. ЧТЕНИЕ ЗАГРУЗОЧНОГО СЕКТОРА (BPB) ---
         bs = self.f.read(512)
-        
         self.raw_bs = bs 
         
         self.bs_oem = bs[3:11].decode('ascii', errors='ignore').strip()
@@ -54,39 +49,28 @@ class FATAnalyzer:
         self.tot_sec16 = struct.unpack('<H', bs[19:21])[0] 
         self.media = bs[21]
         self.fat_sz16 = struct.unpack('<H', bs[22:24])[0]
-        # Читаем 32-битный счетчик секторов (для дисков > 32MB)
         self.tot_sec32 = struct.unpack('<I', bs[32:36])[0] 
         
         self.vol_lab_bs = bs[43:54].decode('cp866', errors='replace').strip()
         
-        # === ИСПРАВЛЕНИЕ: Выбор правильного размера диска ===
         if self.tot_sec16 != 0:
             self.total_sectors = self.tot_sec16
         else:
             self.total_sectors = self.tot_sec32
         
-        # Расчет геометрии
         self.clus_sz = self.bps * self.spc
-        
-        # Адреса областей
         self.addr_fat1 = self.offset + (self.res_sec * self.bps)
         self.fat_size_bytes = self.fat_sz16 * self.bps
         self.addr_root = self.addr_fat1 + (self.n_fats * self.fat_size_bytes)
         self.root_size_bytes = self.root_cnt * 32
-        
-        # Вычисляем начало области данных
         root_sectors = (self.root_cnt * 32 + self.bps - 1) // self.bps
         self.addr_data = self.addr_root + (root_sectors * self.bps)
-
-        # Определение типа ФС
         data_sectors = self.total_sectors - (self.res_sec + (self.n_fats * self.fat_sz16) + root_sectors)
         self.clusters_cnt = data_sectors // self.spc
         
         if self.clusters_cnt < 4085: self.fat_type = "FAT12"
         elif self.clusters_cnt < 65525: self.fat_type = "FAT16"
         else: self.fat_type = "FAT32"
-
-        # Читаем всю FAT таблицу
         self.f.seek(self.addr_fat1)
         self.fat_table = self.f.read(self.fat_size_bytes)
         
@@ -98,7 +82,7 @@ class FATAnalyzer:
         if self.fat_type == "FAT16":
             off = n * 2
             return struct.unpack('<H', self.fat_table[off:off+2])[0]
-        else: # FAT12
+        else: 
             off = int(n * 1.5)
             v1 = self.fat_table[off]
             v2 = self.fat_table[off+1]
@@ -197,8 +181,6 @@ class FATAnalyzer:
         print(f"============================================================")
         print(f" АНАЛИЗАТОР ФАЙЛОВОЙ СИСТЕМЫ: {FILENAME}")
         print(f"============================================================")
-        
-        # --- БЛОК 1: BPB ---
         print("\n[1] ТЕХНИЧЕСКИЕ ПАРАМЕТРЫ (BPB)")
         print(f"Тип ФС: {self.fat_type} | Кластеров: {self.clusters_cnt}")
         print(f"OEM Name: {self.bs_oem} | Метка в заголовке: {self.vol_lab_bs}")
@@ -206,7 +188,6 @@ class FATAnalyzer:
         print(f"Reserved Sectors: {self.res_sec}")
         print(f"Sectors Per FAT:  {self.fat_sz16}")
         print(f"Root Entries:     {self.root_cnt}")
-        # Выводим оба поля размера для наглядности
         print(f"Total Sectors 16: {self.tot_sec16}")
         print(f"Total Sectors 32: {self.tot_sec32}")
         print(f"--> Итого секторов (расчетное): {self.total_sectors}")
@@ -214,11 +195,7 @@ class FATAnalyzer:
         print(f"Адрес FAT1: {hex(self.addr_fat1)}")
         print(f"Адрес Root: {hex(self.addr_root)}")
         print(f"Адрес Data: {hex(self.addr_data)}")
-
-        # Запускаем сканирование
         self.scan_recursive(self.addr_root, self.root_cnt, "/", True)
-
-        # --- БЛОК 2: ТАБЛИЦА ФАЙЛОВ ---
         print("\n[2] ПОЛНАЯ ФАЙЛОВАЯ СТРУКТУРА")
         print(f"{'ПУТЬ/ИМЯ':<45} | {'АТР':<6} | {'РАЗМЕР':<8} | {'КЛСТ':<5} | {'ПРЕВЬЮ'}")
         print("-" * 100)
@@ -228,8 +205,6 @@ class FATAnalyzer:
             if len(full_p) > 44: full_p = full_p[:41] + "..."
             prev_short = item['preview_txt'][:20]
             print(f"{full_p:<45} | {item['attr']:<6} | {item['size']:<8} | {item['clus']:<5} | {prev_short}")
-
-        # --- БЛОК 3: ОТВЕТЫ ---
         limit = 0xFFF0 if self.fat_type == "FAT16" else 0xFF0
         alloc = 0
         total_recs = int(self.fat_size_bytes / (2 if self.fat_type == "FAT16" else 1.5))
@@ -257,8 +232,6 @@ class FATAnalyzer:
         print(f"6. Занимают кластеров (файлы):{total_clus_files}")
         print(f"7. Зарезервировано секторов:  {self.res_sec}")
         print(f"8. OEM название:              {self.bs_oem}")
-
-        # --- БЛОК 4: ПОДРОБНОСТИ ---
         print("\n" + "="*60)
         print("[4] СОДЕРЖИМОЕ КАЖДОГО ФАЙЛА (HEX + TEXT)")
         print("="*60)
@@ -277,8 +250,6 @@ class FATAnalyzer:
             else:
                 print("(Пустой файл)")
             print("-" * 40)
-
-        # --- БЛОК 5: ШПАРГАЛКА ---
         print("\n" + "="*60)
         print("[5] ШПАРГАЛКА ДЛЯ ЗАЩИТЫ (BPB & ТЕОРИЯ)")
         print("="*60)
@@ -319,8 +290,6 @@ class FATAnalyzer:
             print(f"   День (5 бит,  0-4):   {d_val & 0x1F}")
         else:
             print("(Файлов нет для примера, но учите структуру бит: H-5, M-6, S-5 | Y-7, M-4, D-5)")
-
-        # --- БЛОК 6: ЦЕПОЧКИ ---
         print("\n" + "="*60)
         print("[6] ЦЕПОЧКИ КЛАСТЕРОВ (ЕСЛИ ФРАГМЕНТАЦИЯ)")
         print("="*60)
@@ -346,8 +315,6 @@ class FATAnalyzer:
                 else:
                     print("   (Файл записан подряд)")
             print("-" * 20)
-
-        # --- БЛОК 7: ДЕТАЛИ ДАТЫ ---
         print("\n" + "="*60)
         print("[7] ДЕТАЛЬНАЯ РАСШИФРОВКА ДАТЫ И ВРЕМЕНИ")
         print("="*60)

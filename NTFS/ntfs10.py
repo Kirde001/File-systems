@@ -91,7 +91,6 @@ class NTFSDetailedAnalyzer:
         self.f = open(filepath, 'rb')
         self.partition_offset = partition_offset
         
-        # ДОБАВЛЕНО: Инициализация резервных записей MFT (12-23)
         for i in range(12, 24):
             self.NTFS_SYS_FILES[i] = ("<Reserved>", f"Зарезервировано (MFT #{i})")
         
@@ -102,7 +101,7 @@ class NTFSDetailedAnalyzer:
         
         self.ntfs_version = "Неизвестно"
         self.is_dirty = False
-        self.detected_vol_flags = [] # ДОБАВЛЕНО: Список всех флагов тома
+        self.detected_vol_flags = [] 
         self.fixup_errors_detected = 0 
         
         self.total_dirs = 0
@@ -262,7 +261,6 @@ class NTFSDetailedAnalyzer:
                 if not raw_record or len(raw_record) < self.mft_record_size: break
                 
                 magic = raw_record[0:4]
-                # ДОБАВЛЕНО: Парсинг BAAD записей
                 if magic in (b'FILE', b'BAAD'):
                     record = self.apply_fixups(raw_record, record_count)
                     flags = struct.unpack('<H', record[0x16:0x18])[0]
@@ -335,11 +333,11 @@ class NTFSDetailedAnalyzer:
             'id': mft_num,
             'magic_str': magic_str,
             'magic_hex': magic_hex,
-            'is_corrupted_by_chkdsk': (magic_str == 'BAAD'), # ДОБАВЛЕНО: Индикатор повреждения MFT
+            'is_corrupted_by_chkdsk': (magic_str == 'BAAD'), 
             'flags_hex': flags_hex,
             'is_deleted': is_deleted,
             'seq_num': seq_num,
-            'seq_num_zero': (seq_num == 0), # ДОБАВЛЕНО: Отключенная проверка целостности
+            'seq_num_zero': (seq_num == 0), 
             'hard_links': hard_links,
             'base_ref': base_ref,
             'lsn': lsn,                        
@@ -354,8 +352,8 @@ class NTFSDetailedAnalyzer:
             'is_dir': is_dir,
             'size': 0,
             'real_size': 0,
-            'alloc_data_size': 0, # ДОБАВЛЕНО: Allocated Size для $DATA
-            'init_data_size': 0,  # ДОБАВЛЕНО: Initialized Size для $DATA
+            'alloc_data_size': 0, 
+            'init_data_size': 0,  
             'runs': [],
             'alt_streams': [],
             'abs_addr': abs_addr,
@@ -367,7 +365,7 @@ class NTFSDetailedAnalyzer:
             'm_time_mft': 'Нет', 'm_time_mft_hex': 'N/A', 'm_time_mft_raw': 0,
             'a_time_altered': 'Нет', 'a_time_altered_hex': 'N/A', 'a_time_altered_raw': 0, 
             'r_time_read': 'Нет', 
-            'max_versions': None, 'version_num': None, 'class_id': None, # ДОБАВЛЕНО: Поля из 0x10
+            'max_versions': None, 'version_num': None, 'class_id': None, 
             'owner_id': 'N/A', 'security_id': 'N/A',
             'quota_charged': 'N/A',            
             'usn': 'N/A',                      
@@ -380,7 +378,7 @@ class NTFSDetailedAnalyzer:
             'data_res_offset': 0,
             'is_compressed': False,
             'obj_id': None, 'birth_vol_id': None, 'birth_obj_id': None, 'domain_id': None,
-            'has_index_root': False # ДОБАВЛЕНО: Флаг наличия B+ дерева
+            'has_index_root': False 
         }
         
         if mft_num in self.NTFS_SYS_FILES:
@@ -399,8 +397,6 @@ class NTFSDetailedAnalyzer:
             
             non_resident = record[curr_offset+8]
             attr_flags = struct.unpack('<H', record[curr_offset+0x0C:curr_offset+0x0E])[0]
-            
-            # 0x10 $STANDARD_INFORMATION
             if attr_type == 0x10 and non_resident == 0:
                 res_offset = struct.unpack('<H', record[curr_offset+0x14:curr_offset+0x16])[0]
                 si_data = record[curr_offset+res_offset : curr_offset+attr_len]
@@ -422,8 +418,6 @@ class NTFSDetailedAnalyzer:
                     file_info['r_time_read'] = ntfs_time_to_str(r_time_read)
                     file_info['dos_attrs'] = parse_dos_attrs(dos_attr_val)
                     file_info['dos_attrs_hex'] = f"0x{dos_attr_val:08X}"
-
-                # ДОБАВЛЕНО: Дополнительные поля $STANDARD_INFORMATION (0x24 - 0x30)
                 if len(si_data) >= 48:
                     file_info['max_versions'] = struct.unpack('<I', si_data[36:40])[0]
                     file_info['version_num'] = struct.unpack('<I', si_data[40:44])[0]
@@ -447,22 +441,16 @@ class NTFSDetailedAnalyzer:
                     l_mft_ref = struct.unpack('<Q', attr_list_data[list_curr+0x10:list_curr+0x18])[0] & 0xFFFFFFFFFFFF
                     file_info['attr_list_refs'].append((hex(l_type), l_mft_ref))
                     list_curr += l_len
-
-            # 0x30 $FILE_NAME
             elif attr_type == 0x30 and non_resident == 0:
                 res_offset = struct.unpack('<H', record[curr_offset+0x14:curr_offset+0x16])[0]
                 fn_data = record[curr_offset+res_offset : curr_offset+attr_len]
                 parent_ref = struct.unpack('<Q', fn_data[0:8])[0]
                 parent_mft = parent_ref & 0xFFFFFFFFFFFF
-                
-                # ДОБАВЛЕНО: Извлечение Parent Sequence Number и Размеров из $FILE_NAME
                 parent_seq = (parent_ref >> 48) & 0xFFFF 
-                
+       
                 fn_c_time = struct.unpack('<Q', fn_data[8:16])[0]
                 fn_m_time = struct.unpack('<Q', fn_data[16:24])[0]
                 file_info['fn_times'].append({'c_time': fn_c_time, 'm_time': fn_m_time})
-                
-                # ДОБАВЛЕНО: Размеры внутри $FILE_NAME
                 fn_alloc_size = struct.unpack('<Q', fn_data[40:48])[0]
                 fn_real_size = struct.unpack('<Q', fn_data[48:56])[0]
                 
@@ -471,8 +459,7 @@ class NTFSDetailedAnalyzer:
                 name = fn_data[0x42:0x42+fname_len*2].decode('utf-16le', errors='ignore')
                 
                 ns_str = get_namespace_str(name_type)
-                
-                # ДОБАВЛЕНО: Сохраняем расширенные данные о $FILE_NAME
+
                 file_info['names_list'].append({
                     'name': f"{name} [{ns_str}]",
                     'parent_seq': parent_seq,
@@ -505,8 +492,6 @@ class NTFSDetailedAnalyzer:
                 vol_name = record[curr_offset+res_offset : curr_offset+res_offset+res_len].decode('utf-16le', errors='ignore')
                 self.volume_label = vol_name
                 self.detailed_vol_record = (mft_num, abs_addr, record, curr_offset, res_offset, res_len)
-                
-            # 0x70 $VOLUME_INFORMATION
             elif attr_type == 0x70 and non_resident == 0:
                 res_offset = struct.unpack('<H', record[curr_offset+0x14:curr_offset+0x16])[0]
                 vol_info_data = record[curr_offset+res_offset : curr_offset+attr_len]
@@ -516,16 +501,12 @@ class NTFSDetailedAnalyzer:
                     vol_flags = struct.unpack('<H', vol_info_data[10:12])[0]
                     self.ntfs_version = f"{major_ver}.{minor_ver}"
                     self.is_dirty = bool(vol_flags & 0x0001)
-                    
-                    # ДОБАВЛЕНО: Парсинг расширенных флагов $VOLUME_INFORMATION
                     vol_flags_dict = {
                         0x0001: "Dirty", 0x0002: "Resize LogFile", 0x0004: "Upgrade on Mount",
                         0x0008: "Mounted on NT4", 0x0010: "Delete USN underway", 
                         0x0020: "Repair Object Ids", 0x8000: "Modified by chkdsk"
                     }
                     self.detected_vol_flags = [name for mask, name in vol_flags_dict.items() if vol_flags & mask]
-
-            # 0x80 $DATA
             elif attr_type == 0x80:
                 name_len = record[curr_offset+0x09]
                 stream_name = ""
@@ -538,7 +519,7 @@ class NTFSDetailedAnalyzer:
                 if non_resident:
                     alloc_size = struct.unpack('<Q', record[curr_offset+0x28:curr_offset+0x30])[0]
                     real_size = struct.unpack('<Q', record[curr_offset+0x30:curr_offset+0x38])[0]
-                    init_size = struct.unpack('<Q', record[curr_offset+0x38:curr_offset+0x40])[0] # ДОБАВЛЕНО: Initialized Data Size
+                    init_size = struct.unpack('<Q', record[curr_offset+0x38:curr_offset+0x40])[0] 
                     
                     run_offset = struct.unpack('<H', record[curr_offset+0x20:curr_offset+0x22])[0]
                     run_data = record[curr_offset+run_offset : curr_offset+attr_len]
@@ -547,8 +528,8 @@ class NTFSDetailedAnalyzer:
                     if stream_name == "":
                         file_info['size'] = real_size
                         file_info['real_size'] = real_size
-                        file_info['alloc_data_size'] = alloc_size   # ДОБАВЛЕНО
-                        file_info['init_data_size'] = init_size     # ДОБАВЛЕНО
+                        file_info['alloc_data_size'] = alloc_size   
+                        file_info['init_data_size'] = init_size     
                         file_info['runs'] = runs
                         file_info['runs_detail'] = run_details
                         file_info['data_resident'] = False
@@ -566,8 +547,8 @@ class NTFSDetailedAnalyzer:
                     if stream_name == "":
                         file_info['size'] = res_len
                         file_info['real_size'] = res_len
-                        file_info['alloc_data_size'] = res_len # Для резидентных совпадает
-                        file_info['init_data_size'] = res_len  # Для резидентных совпадает
+                        file_info['alloc_data_size'] = res_len 
+                        file_info['init_data_size'] = res_len  
                         file_info['data_resident'] = True
                         file_info['data_res_offset'] = curr_offset + res_offset
                         file_info['is_compressed'] = is_compressed
@@ -576,8 +557,7 @@ class NTFSDetailedAnalyzer:
                             'name': stream_name, 'size': res_len, 
                             'resident': True, 'res_offset': curr_offset + res_offset
                         })
-                        
-            # ДОБАВЛЕНО: Индикация наличия B+ дерева каталогов
+
             elif attr_type == 0x90:
                 file_info['has_index_root'] = True
             
@@ -693,7 +673,6 @@ class NTFSDetailedAnalyzer:
         elif self.ntfs_version == "3.1": print("   -> Характерно для Windows XP и новее.")
         
         print(f"⚠️ Статус тома (Флаг Dirty): {'ДА (Требуется chkdsk!)' if self.is_dirty else 'Чистый (OK)'}")
-        # ДОБАВЛЕНО: Вывод подробных флагов тома
         if self.detected_vol_flags:
             print(f"ℹ️ Дополнительные флаги тома: {', '.join(self.detected_vol_flags)}")
 
@@ -737,21 +716,19 @@ class NTFSDetailedAnalyzer:
         if self.fixup_errors_detected > 0:
             print(f"⚠️  [ФОРЕНЗИКА ALERT] ОБНАРУЖЕНО {self.fixup_errors_detected} ОШИБОК FIXUP В СЕКТОРАХ (Возможно повреждение диска)!")
 
-        # 4.1 СИСТЕМНЫЕ ФАЙЛЫ
         print("\n[ 4.1 СИСТЕМНЫЕ МЕТАФАЙЛЫ И РЕЗЕРВ (Сигнатура MFT: 'FILE' [HEX: 46 49 4C 45]) ]")
         print("════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════")
         print(f"{'MFT#':<5} {'Имя файла':<12} {'Адрес записи (MFT)':<20} {'Размер':<10} {'Размещение (Data Run)':<25} {'Назначение и описание файла'}")
         print("────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────")
         for mft_id in sorted(self.parsed_records.keys()):
             f = self.parsed_records[mft_id]
-            if not f['is_sys'] and mft_id > 23: continue # ДОБАВЛЕНО: Увеличено до 23 для отображения зарезервированных записей
+            if not f['is_sys'] and mft_id > 23: continue 
             
             size_str = f"{f['size']} B"
             lcn_str = f"LCN: {f['runs'][0]['lcn']}" if f['runs'] else "Resident (Атрибут 0x80)"
             desc = f['sys_desc'] if f['sys_desc'] else "Внутренний системный файл/поток"
             print(f"{mft_id:<5} {f['name']:<12} 0x{f['abs_addr']:08X}{' '*10} {size_str:<10} {lcn_str:<25} {desc}")
 
-        # 4.2 ПОЛЬЗОВАТЕЛЬСКИЕ ФАЙЛЫ
         print("\n[ 4.2 ПОЛЬЗОВАТЕЛЬСКИЕ ФАЙЛЫ И КАТАЛОГИ (Подробный разбор полей и флагов) ]")
         print("════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════")
         for mft_id in sorted(self.parsed_records.keys()):
@@ -769,8 +746,7 @@ class NTFSDetailedAnalyzer:
                 location = f"Нерезидентный. LCN: {f['runs'][0]['lcn']} (Абс. Смещение Данных: 0x{abs_data:X})"
                 
             print(f"MFT ID: {mft_id:<5} [HEX: 0x{mft_id:X}] | Имя: {f['name']:<20} | Тип: {f_type} [Флаги: {f['flags_hex']}]")
-            
-            # ДОБАВЛЕНО: Индикаторы повреждений/отключенных проверок
+
             if f['is_corrupted_by_chkdsk']:
                 print(f" │  [!] ЗАПИСЬ ПОВРЕЖДЕНА И ПЕРЕЗАПИСАНА CHKDSK (Сигнатура BAAD вместо FILE)")
             if f['seq_num_zero']:
@@ -787,11 +763,9 @@ class NTFSDetailedAnalyzer:
             if len(f['names_list']) > 0:
                 print(f" ├─ Имена файла ($FILE_NAME) [{len(f['names_list'])} шт.]:")
                 for n_idx, n_val in enumerate(f['names_list']):
-                    # ДОБАВЛЕНО: Вывод расширенной информации из $FILE_NAME
                     print(f" │    {n_idx+1}. {n_val['name']} | Seq Родителя: {n_val['parent_seq']} | Alloc: {n_val['alloc_size']} B | Real: {n_val['real_size']} B")
             
             print(f" ├─ Адрес записи: 0x{f['abs_addr']:08X} (Абсолютное смещение самой MFT-записи на диске)")
-            # ДОБАВЛЕНО: Расширенный вывод размеров $DATA
             print(f" ├─ Размер $DATA: Real (Данные): {f['real_size']} B | Allocated (На диске): {f['alloc_data_size']} B | Initialized: {f['init_data_size']} B")
             
             print(f" ├─ C-Time (Создание):    {f['c_time']} [Сырой HEX: {f['c_time_hex']}]")
@@ -804,8 +778,6 @@ class NTFSDetailedAnalyzer:
                 print(f" │  Время в $STD_INFO старше, чем в $FILE_NAME. Данные могли быть сфальсифицированы.")
 
             print(f" ├─ Атрибуты DOS: {f['dos_attrs']} [HEX: {f['dos_attrs_hex']}]")
-            
-            # ДОБАВЛЕНО: Вывод дополнительных параметров $STANDARD_INFORMATION (Версии/Классы)
             ext_std_info = []
             if f['max_versions']: ext_std_info.append(f"Max Ver: {f['max_versions']}")
             if f['version_num']: ext_std_info.append(f"Ver #: {f['version_num']}")
@@ -821,7 +793,6 @@ class NTFSDetailedAnalyzer:
                 print(f" ├─ Трекинг (0x40): Object ID: {f['obj_id']}")
                 print(f" │                  Birth Vol: {f['birth_vol_id']} | Birth Obj: {f['birth_obj_id']}")
                 
-            # ДОБАВЛЕНО: Индикатор B+ дерева (Важно для поиска INDX slack)
             if f['has_index_root']:
                 print(f" ├─ Дерево INDX:  Присутствует B+ Дерево каталога ($INDEX_ROOT). Доступен для Slack-анализа.")
 
