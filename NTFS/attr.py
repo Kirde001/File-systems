@@ -210,8 +210,8 @@ def main():
                                     m_time = ntfs_time_to_str(struct.unpack('<Q', si_data[16:24])[0])
                                     r_time = ntfs_time_to_str(struct.unpack('<Q', si_data[24:32])[0])
                                     dos_attr = parse_dos_attrs(struct.unpack('<I', si_data[32:36])[0])
-                                    out.write(f"         Время создания: {c_time}, Изменение: {a_time}, MFT: {m_time}, Доступ: {r_time}.\n")
-                                    out.write(f"         DOS Атрибуты: {dos_attr}.\n")
+                                    out.write(f"         Время создания: {c_time}, изменение: {a_time}, MFT: {m_time}, доступ: {r_time}.\n")
+                                    out.write(f"         DOS атрибуты: {dos_attr}.\n")
                                     
                             elif attr_type == 0x30 and non_res == 0:
                                 res_off = struct.unpack('<H', record[curr_offset+0x14:curr_offset+0x16])[0]

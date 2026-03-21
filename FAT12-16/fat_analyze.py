@@ -3,7 +3,7 @@ import math
 import os
 import sys
 
-FILENAME = "fat16_variant_02.img"   
+FILENAME = "disk_3.vhd"   
 VHD_OFFSET = 0x00000         
 
 def decode_dos_time(val):
