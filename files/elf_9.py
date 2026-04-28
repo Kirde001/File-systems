@@ -66,6 +66,18 @@ SHT_TYPE_NAMES = {
 EI_CLASS_32, EI_CLASS_64 = 1, 2
 
 
+def _hx_elf_addr(ei_class: int, v: int) -> str:
+    """Адрес/смещение/размер в полной ширине ELF (ведущие нули)."""
+    if ei_class == EI_CLASS_64:
+        return f"0x{v & 0xFFFFFFFFFFFFFFFF:016X}"
+    return f"0x{v & 0xFFFFFFFF:08X}"
+
+
+def _hx_u32(v: int) -> str:
+    """32-битные поля (p_type, sh_name, p_flags в таблицах и т.п.)."""
+    return f"0x{v & 0xFFFFFFFF:08X}"
+
+
 def _read_cstr(data: bytes, off: int) -> str:
     if off >= len(data):
         return ""
@@ -191,7 +203,7 @@ def _ph_flags_methodology_ru(p_flags: int) -> str:
         parts.append("W (запись)")
     if x:
         parts.append("E (исполнение)")
-    return " + ".join(parts) if parts else f"0x{p_flags:X}"
+    return " + ".join(parts) if parts else _hx_u32(p_flags)
 
 
 def _hex_spaced(data: bytes) -> str:
@@ -214,10 +226,10 @@ def phdr_methodology_lines_elf32(raw: bytes, off: int) -> tuple[list[str], list[
         f"- p_offset {_hex_spaced(b[4:8])} = 0x{p_offset:08X}.",
         f"- p_vaddr {_hex_spaced(b[8:12])} = 0x{p_vaddr:08X}.",
         f"- p_paddr {_hex_spaced(b[12:16])} = 0x{p_paddr:08X}.",
-        f"- p_filesz {_hex_spaced(b[16:20])} = 0x{p_filesz:X} = {p_filesz} байт.",
-        f"- p_memsz {_hex_spaced(b[20:24])} = 0x{p_memsz:X} = {p_memsz} байт.",
+        f"- p_filesz {_hex_spaced(b[16:20])} = 0x{p_filesz:08X} = {p_filesz} байт.",
+        f"- p_memsz {_hex_spaced(b[20:24])} = 0x{p_memsz:08X} = {p_memsz} байт.",
         f"- p_flags {_hex_spaced(b[24:28])} = 0x{p_flags:08X} = {_ph_flags_methodology_ru(p_flags)}.",
-        f"- p_align {_hex_spaced(b[28:32])} = 0x{p_align:X}.",
+        f"- p_align {_hex_spaced(b[28:32])} = 0x{p_align:08X}.",
     ]
     tail.extend(_phdr_methodology_tail_paragraphs(p_type, p_flags, p_filesz))
     return (lines, tail)
@@ -233,12 +245,12 @@ def phdr_methodology_lines_elf64(raw: bytes, off: int) -> tuple[list[str], list[
     lines = [
         f"- p_type {_hex_spaced(b[0:4])} = 0x{p_type:08X} = {pt_name(p_type)}.",
         f"- p_flags {_hex_spaced(b[4:8])} = 0x{p_flags:08X} = {_ph_flags_methodology_ru(p_flags)}.",
-        f"- p_offset  {_hex_spaced(b[8:16])} = 0x{p_offset:X}.",
-        f"- p_vaddr  {_hex_spaced(b[16:24])} = 0x{p_vaddr:X}.",
-        f"- p_paddr  {_hex_spaced(b[24:32])} = 0x{p_paddr:X}.",
-        f"- p_filesz {_hex_spaced(b[32:40])} = 0x{p_filesz:X} = {p_filesz} байт.",
-        f"- p_memsz {_hex_spaced(b[40:48])} = 0x{p_memsz:X} = {p_memsz} байт.",
-        f"- p_align {_hex_spaced(b[48:56])} = 0x{p_align:X}.",
+        f"- p_offset  {_hex_spaced(b[8:16])} = 0x{p_offset:016X}.",
+        f"- p_vaddr  {_hex_spaced(b[16:24])} = 0x{p_vaddr:016X}.",
+        f"- p_paddr  {_hex_spaced(b[24:32])} = 0x{p_paddr:016X}.",
+        f"- p_filesz {_hex_spaced(b[32:40])} = 0x{p_filesz:016X} = {p_filesz} байт.",
+        f"- p_memsz {_hex_spaced(b[40:48])} = 0x{p_memsz:016X} = {p_memsz} байт.",
+        f"- p_align {_hex_spaced(b[48:56])} = 0x{p_align:016X}.",
     ]
     tail.extend(_phdr_methodology_tail_paragraphs(p_type, p_flags, p_filesz))
     return (lines, tail)
@@ -332,14 +344,14 @@ def shdr_field_lines_elf64(raw: bytes, off: int) -> list[str]:
     return [
         f"- `sh_name` — `{hx(0, 4)}` → **0x{sh_name:08X}**.",
         f"- `sh_type` — `{hx(4, 4)}` → **0x{sh_type:08X}** ({SHT_TYPE_NAMES.get(sh_type, '?')}).",
-        f"- `sh_flags` — `{hx(8, 8)}` → **0x{sh_flags:X}**.",
-        f"- `sh_addr` — `{hx(16, 8)}` → **0x{sh_addr:X}**.",
-        f"- `sh_offset` — `{hx(24, 8)}` → **0x{sh_offset:X}**.",
-        f"- `sh_size` — `{hx(32, 8)}` → **0x{sh_size:X}** ({sh_size} байт).",
+        f"- `sh_flags` — `{hx(8, 8)}` → **0x{sh_flags:016X}**.",
+        f"- `sh_addr` — `{hx(16, 8)}` → **0x{sh_addr:016X}**.",
+        f"- `sh_offset` — `{hx(24, 8)}` → **0x{sh_offset:016X}**.",
+        f"- `sh_size` — `{hx(32, 8)}` → **0x{sh_size:016X}** ({sh_size} байт).",
         f"- `sh_link` — `{hx(40, 4)}` → **0x{sh_link:08X}**.",
         f"- `sh_info` — `{hx(44, 4)}` → **0x{sh_info:08X}**.",
-        f"- `sh_addralign` — `{hx(48, 8)}` → **0x{sh_addralign:X}**.",
-        f"- `sh_entsize` — `{hx(56, 8)}` → **0x{sh_entsize:X}**.",
+        f"- `sh_addralign` — `{hx(48, 8)}` → **0x{sh_addralign:016X}**.",
+        f"- `sh_entsize` — `{hx(56, 8)}` → **0x{sh_entsize:016X}**.",
     ]
 
 
@@ -383,7 +395,7 @@ def pt_short(pt: int) -> str:
         PT_SHLIB: "SHLIB",
         PT_PHDR: "PHDR",
         PT_TLS: "TLS",
-    }.get(pt, f"0x{pt:X}")
+    }.get(pt, _hx_u32(pt))
 
 
 def sht_short(st: int) -> str:
@@ -459,8 +471,8 @@ def shdr_methodology_shstrtab_lines(raw: bytes, off: int, ei_class: int) -> list
         return [
             f"- sh_name {_hex_spaced(b[0:4])} = 0x{sh_name:08X} (имя в начале .shstrtab).",
             f"- sh_type {_hex_spaced(b[4:8])} = 0x{sh_type:08X} ({sht_short(sh_type)}).",
-            f"- sh_offset {_hex_spaced(b[24:32])} = 0x{sh_offset:X}.",
-            f"- sh_size {_hex_spaced(b[32:40])} = 0x{sh_size:X} = {sh_size} байта.",
+            f"- sh_offset {_hex_spaced(b[24:32])} = 0x{sh_offset:016X}.",
+            f"- sh_size {_hex_spaced(b[32:40])} = 0x{sh_size:016X} = {sh_size} байта.",
         ]
     b = raw[off : off + 40]
     if len(b) < 40:
@@ -487,12 +499,12 @@ def shdr_methodology_text_lines(raw: bytes, off: int, ei_class: int) -> list[str
         sh_size = struct.unpack_from("<Q", b, 32)[0]
         sh_addralign = struct.unpack_from("<Q", b, 48)[0]
         return [
-            f"- sh_name {_hex_spaced(b[0:4])} = 0x{sh_name:X} (смещение в .shstrtab).",
+            f"- sh_name {_hex_spaced(b[0:4])} = 0x{sh_name:08X} (смещение в .shstrtab).",
             f"- sh_type {_hex_spaced(b[4:8])} = 0x{sh_type:08X} = {sht_short(sh_type)}.",
             f"- sh_flags {_hex_spaced(b[8:16])} = 0x{sh_flags:016X}.",
-            f"- sh_offset {_hex_spaced(b[24:32])} = 0x{sh_offset:X}.",
-            f"- sh_size {_hex_spaced(b[32:40])} = 0x{sh_size:X} = {sh_size} байт.",
-            f"- sh_addralign {_hex_spaced(b[48:56])} = 0x{sh_addralign:X} = {sh_addralign} байт.",
+            f"- sh_offset {_hex_spaced(b[24:32])} = 0x{sh_offset:016X}.",
+            f"- sh_size {_hex_spaced(b[32:40])} = 0x{sh_size:016X} = {sh_size} байт.",
+            f"- sh_addralign {_hex_spaced(b[48:56])} = 0x{sh_addralign:016X} = {sh_addralign} байт.",
         ]
     b = raw[off : off + 40]
     if len(b) < 40:
@@ -501,7 +513,7 @@ def shdr_methodology_text_lines(raw: bytes, off: int, ei_class: int) -> list[str
         "<IIIIIIIIII", b
     )
     return [
-        f"- sh_name {_hex_spaced(b[0:4])} = 0x{sh_name:X} (смещение в .shstrtab).",
+        f"- sh_name {_hex_spaced(b[0:4])} = 0x{sh_name:08X} (смещение в .shstrtab).",
         f"- sh_type {_hex_spaced(b[4:8])} = 0x{sh_type:08X} = {sht_short(sh_type)}.",
         f"- sh_flags {_hex_spaced(b[8:12])} = 0x{sh_flags:08X}.",
         f"- sh_offset {_hex_spaced(b[16:20])} = 0x{sh_offset:08X}.",
@@ -513,6 +525,7 @@ def shdr_methodology_text_lines(raw: bytes, off: int, ei_class: int) -> list[str
 def build_key_sections_table(
     shdrs: List[dict],
     sec_name_fn,
+    ei_class: int,
 ) -> list[tuple[str, str, str, str, str, str, str]]:
     """Таблица ключевых секций: Секция | Индекс | sh_name | sh_offset | sh_size | Тип | Флаги."""
     want = (".text", ".data", ".rodata", ".bss", ".shstrtab")
@@ -523,14 +536,14 @@ def build_key_sections_table(
             continue
         fl = _sh_flags_str(int(sh["sh_flags"]))
         st = sht_short(int(sh["sh_type"]))
-        off_cell = "—" if int(sh["sh_type"]) == SHT_NOBITS else f"0x{sh['sh_offset']:X}"
+        off_cell = "—" if int(sh["sh_type"]) == SHT_NOBITS else _hx_elf_addr(ei_class, int(sh["sh_offset"]))
         rows.append(
             (
                 f"**{name}**",
                 str(sh["index"]),
-                f"0x{sh['sh_name']:X}",
+                _hx_u32(int(sh["sh_name"])),
                 off_cell,
-                f"0x{sh['sh_size']:X}",
+                _hx_elf_addr(ei_class, int(sh["sh_size"])),
                 st,
                 fl,
             )
@@ -876,7 +889,7 @@ def read_elf64_shdrs(raw: bytes, e_shoff: int, e_shnum: int, entsize: int) -> Li
 
 
 def pt_name(t: int) -> str:
-    return PT_TYPE_NAMES.get(t, f"0x{t:X} (неизвестный/специфичный)")
+    return PT_TYPE_NAMES.get(t, f"{_hx_u32(t)} (неизвестный/специфичный)")
 
 
 def analyze_elf(file_path: str) -> None:
@@ -899,6 +912,10 @@ def analyze_elf(file_path: str) -> None:
         return
 
     with open(report_path, "w", encoding="utf-8") as out:
+
+        def hxa(v: int) -> str:
+            return _hx_elf_addr(ei_class, v)
+
         log_sep("=")
         log(f"{'ЛАБОРАТОРНАЯ РАБОТА №9 — АНАЛИЗ ELF':^110}")
         log(f"{('Файл: ' + os.path.basename(file_path)):^110}")
@@ -969,20 +986,20 @@ def analyze_elf(file_path: str) -> None:
         e_phoff_v = int(ehdr["e_phoff"])
         e_phent_v = int(ehdr["e_phentsize"])
         e_phnum_v = int(ehdr["e_phnum"])
-        log(f"- Начало 0x{e_phoff_v:X} (из e_phoff).")
-        log(f"- Размер одного {e_phent_v} байт (0x{e_phent_v:X} из e_phentsize).")
+        log(f"- Начало {hxa(e_phoff_v)} (из e_phoff).")
+        log(f"- Размер одного {e_phent_v} байт ({hxa(e_phent_v)} из e_phentsize).")
         log(f"- Количество {e_phnum_v} штук (из e_phnum).")
         log()
         log("Формула для поиска Program Header.")
         log()
-        log(f"`PH_N_offset = 0x{e_phoff_v:X} + (N × 0x{e_phent_v:X})`")
+        log(f"`PH_N_offset = {hxa(e_phoff_v)} + (N × {hxa(e_phent_v)})`")
         log()
         log("#### Рассчитываем смещения.")
         log()
         for i in range(e_phnum_v):
             off_i = e_phoff_v + i * e_phent_v
             step_hex = i * e_phent_v
-            log(f"- PH_{i} 0x{e_phoff_v:X} + ({i} × {e_phent_v}) = 0x{e_phoff_v:X} + 0x{step_hex:X} = 0x{off_i:X}.")
+            log(f"- PH_{i} {hxa(e_phoff_v)} + ({i} × {e_phent_v}) = {hxa(e_phoff_v)} + {hxa(step_hex)} = {hxa(off_i)}.")
         log()
         hdr_ph_layout = ("Смещение", "Поле", "Размер", "Описание")
         log_markdown_table(log, hdr_ph_layout, phdr_layout_table_rows(ei_class))
@@ -996,7 +1013,7 @@ def analyze_elf(file_path: str) -> None:
             blob_ph, base_ph, ln_ph = slice_for_dump(raw, fo, ph_ent)
             if ln_ph == 0:
                 continue
-            log(f"PH_{idx} (смещение 0x{fo:X}).")
+            log(f"PH_{idx} (смещение {hxa(fo)}).")
             log()
             log_md_code_block(log, "text", format_hex_dump_xxd(blob_ph, base_ph))
             log()
@@ -1032,9 +1049,9 @@ def analyze_elf(file_path: str) -> None:
                     str(ph["index"]),
                     f"0x{pt:08X}<br>({pt_short(pt)})",
                     ph_summary_flags_cell(pf),
-                    f"0x{ph['p_offset']:X}",
-                    f"0x{ph['p_filesz']:X}",
-                    f"0x{ph['p_memsz']:X}",
+                    hxa(int(ph["p_offset"])),
+                    hxa(int(ph["p_filesz"])),
+                    hxa(int(ph["p_memsz"])),
                     ph_summary_naznachenie(pt, pf),
                 )
             )
@@ -1049,8 +1066,8 @@ def analyze_elf(file_path: str) -> None:
         e_shentsize_i = int(ehdr["e_shentsize"])
         e_shnum_v = int(ehdr["e_shnum"])
         idx_str = int(shstrndx)
-        log(f"- Начало 0x{e_shoff_i:X} (из e_shoff).")
-        log(f"- Размер одного {e_shentsize_i} байт (0x{e_shentsize_i:X} из e_shentsize).")
+        log(f"- Начало {hxa(e_shoff_i)} (из e_shoff).")
+        log(f"- Размер одного {e_shentsize_i} байт ({hxa(e_shentsize_i)} из e_shentsize).")
         log(f"- Количество {e_shnum_v} (из e_shnum).")
         log(f"- Индекс .shstrtab {idx_str} (из e_shstrndx).")
         log()
@@ -1060,11 +1077,11 @@ def analyze_elf(file_path: str) -> None:
         log(f"Находим секцию .shstrtab (секция {idx_str}).")
         log()
         log(
-            f"- SH_{idx_str} = 0x{e_shoff_i:X} + ({idx_str} × {e_shentsize_i}) = "
-            f"0x{e_shoff_i:X} + 0x{step_sh:X} = 0x{off_shstr_rec:X}."
+            f"- SH_{idx_str} = {hxa(e_shoff_i)} + ({idx_str} × {e_shentsize_i}) = "
+            f"{hxa(e_shoff_i)} + {hxa(step_sh)} = {hxa(off_shstr_rec)}."
         )
         log()
-        log(f"Читаем заголовок секции #{idx_str} по 0x{off_shstr_rec:X}.")
+        log(f"Читаем заголовок секции #{idx_str} по {hxa(off_shstr_rec)}.")
         log()
         sh_dump_len = e_shentsize_i
         b_shd, a_shd, n_shd = slice_for_dump(raw, off_shstr_rec, sh_dump_len)
@@ -1089,11 +1106,11 @@ def analyze_elf(file_path: str) -> None:
             log(f"#### Находим и анализируем секцию .text (секция {ti}).")
             log()
             log(
-                f"- SH_{ti} = 0x{e_shoff_i:X} + ({ti} × {e_shentsize_i}) = "
-                f"0x{e_shoff_i:X} + 0x{step_tx:X} = 0x{off_text_rec:X}."
+                f"- SH_{ti} = {hxa(e_shoff_i)} + ({ti} × {e_shentsize_i}) = "
+                f"{hxa(e_shoff_i)} + {hxa(step_tx)} = {hxa(off_text_rec)}."
             )
             log()
-            log(f"Читаем заголовок секции #{ti} по 0x{off_text_rec:X}.")
+            log(f"Читаем заголовок секции #{ti} по {hxa(off_text_rec)}.")
             log()
             b_tx, a_tx, n_tx = slice_for_dump(raw, off_text_rec, sh_dump_len)
             if n_tx:
@@ -1111,9 +1128,9 @@ def analyze_elf(file_path: str) -> None:
                 name_abs = sso_tab + shn
                 log("Определяем имя секции .text.")
                 log()
-                log(f"Адрес_имени = shstrtab_offset + sh_name = 0x{sso_tab:X} + 0x{shn:X} = 0x{name_abs:X}.")
+                log(f"Адрес_имени = shstrtab_offset + sh_name = {hxa(sso_tab)} + {hxa(shn)} = {hxa(name_abs)}.")
                 log()
-                log(f"Переходим к 0x{name_abs:X} в файле.")
+                log(f"Переходим к {hxa(name_abs)} в файле.")
                 log()
                 b_nm, a_nm, n_nm = slice_for_dump(raw, name_abs, 64)
                 if n_nm:
@@ -1126,7 +1143,7 @@ def analyze_elf(file_path: str) -> None:
         log_markdown_table(
             log,
             hdr_key_sec,
-            build_key_sections_table(shdrs, sec_name),
+            build_key_sections_table(shdrs, sec_name, ei_class),
             bold_first_col=False,
         )
         log()
@@ -1154,9 +1171,9 @@ def analyze_elf(file_path: str) -> None:
                     nm or "(пусто)",
                     st,
                     fl,
-                    f"0x{sh['sh_addr']:X}",
-                    f"0x{sh['sh_offset']:X}",
-                    f"0x{sh['sh_size']:X}",
+                    hxa(int(sh["sh_addr"])),
+                    hxa(int(sh["sh_offset"])),
+                    hxa(int(sh["sh_size"])),
                 )
             )
 
@@ -1172,8 +1189,8 @@ def analyze_elf(file_path: str) -> None:
             interp_path = _read_cstr(raw, o)
             log("Находим интерпретатор программы.")
             log()
-            log(f"- Из PH_{pix} offset = 0x{o:X}, size = 0x{sz:X}.")
-            log(f"- Переходим к 0x{o:X}.")
+            log(f"- Из PH_{pix} offset = {hxa(o)}, size = {hxa(sz)}.")
+            log(f"- Переходим к {hxa(o)}.")
             log()
             align = max(0, (o // 16) * 16)
             span = min(len(raw) - align, max(64, ((o + sz - align + 15) // 16 + 1) * 16))
@@ -1189,8 +1206,8 @@ def analyze_elf(file_path: str) -> None:
             interp_path = _read_cstr(raw, io)
             log("Находим интерпретатор программы.")
             log()
-            log(f"- В таблице секций `.interp`: offset = 0x{io:X}, size = 0x{isz:X} (отдельного PT_INTERP в PH нет).")
-            log(f"- Переходим к 0x{io:X}.")
+            log(f"- В таблице секций `.interp`: offset = {hxa(io)}, size = {hxa(isz)} (отдельного PT_INTERP в PH нет).")
+            log(f"- Переходим к {hxa(io)}.")
             log()
             bi, ai, ni = slice_for_dump(raw, io, min(isz + 32, len(raw) - io))
             if ni:
@@ -1210,9 +1227,9 @@ def analyze_elf(file_path: str) -> None:
             tlen = min(256, int(text_sec2["sh_size"]))
             log("Анализируем исполняемый код (.text).")
             log()
-            log(f"- Из секции .text offset = 0x{toff:X}.")
+            log(f"- Из секции .text offset = {hxa(toff)}.")
             log()
-            log(f"- Переходим к 0x{toff:X}.")
+            log(f"- Переходим к {hxa(toff)}.")
             log()
             log("Читаем машинный код.")
             log()
@@ -1226,9 +1243,9 @@ def analyze_elf(file_path: str) -> None:
             rlen = min(256, int(ro_sec["sh_size"]))
             log("Находим строки в .rodata.")
             log()
-            log(f"- Из секции .rodata offset = 0x{roff:X}.")
+            log(f"- Из секции .rodata offset = {hxa(roff)}.")
             log()
-            log(f"- Переходим к 0x{roff:X}.")
+            log(f"- Переходим к {hxa(roff)}.")
             log()
             log("Ищем строки программы.")
             log()
@@ -1252,8 +1269,8 @@ def analyze_elf(file_path: str) -> None:
         log("-" * 80)
         if ph0:
             off0 = ph0["file_off"]
-            log(f"1) Файловое смещение первого программного заголовка: 0x{off0:X} "
-                f"(это e_phoff + 0 × e_phentsize = 0x{ehdr['e_phoff']:X}).")
+            log(f"1) Файловое смещение первого программного заголовка: {hxa(int(off0))} "
+                f"(это e_phoff + 0 × e_phentsize = {hxa(int(ehdr['e_phoff']))}).")
             if ei_class == EI_CLASS_32:
                 dump = raw[off0 : off0 + 32]
                 log(f"2) 32 байта hex по этому смещению (Elf32_Phdr):")
@@ -1281,16 +1298,16 @@ def analyze_elf(file_path: str) -> None:
                 log("3) Поля Elf64_Phdr:")
                 log(f"   p_type   = 0x{p_type:08X}  ({pt_name(p_type)})")
                 log(f"   p_flags  = 0x{p_flags:08X}")
-                log(f"   p_offset = 0x{p_offset:X}")
-                log(f"   p_vaddr  = 0x{p_vaddr:X}")
-                log(f"   p_paddr  = 0x{p_paddr:X}")
-                log(f"   p_filesz = 0x{p_filesz:X}")
-                log(f"   p_memsz  = 0x{p_memsz:X}")
-                log(f"   p_align  = 0x{p_align:X}")
-                p_flags = int(p_flags)
+                log(f"   p_offset = {hxa(int(p_offset))}")
+                log(f"   p_vaddr  = {hxa(int(p_vaddr))}")
+                log(f"   p_paddr  = {hxa(int(p_paddr))}")
+                log(f"   p_filesz = {hxa(int(p_filesz))}")
+                log(f"   p_memsz  = {hxa(int(p_memsz))}")
+                log(f"   p_align  = {hxa(int(p_align))}")
+            p_flags = int(p_flags)
             pt0 = int(ph0["p_type"])
             log(
-                f"4) Декодирование p_type словесно: числовое значение 0x{pt0:X} соответствует типу сегмента "
+                f"4) Декодирование p_type словесно: числовое значение {_hx_u32(pt0)} соответствует типу сегмента "
                 f"«{pt_name(pt0)}» (в заголовках ELF это константа семейства PT_*)."
             )
             log("5) Декодирование p_flags побитово:")
@@ -1305,7 +1322,7 @@ def analyze_elf(file_path: str) -> None:
         log("-" * 80)
         if ph1:
             off1 = ph1["file_off"]
-            log(f"1) Смещение второго PH: 0x{off1:X} = e_phoff + 1 × e_phentsize.")
+            log(f"1) Смещение второго PH: {hxa(int(off1))} = e_phoff + 1 × e_phentsize.")
             if ei_class == EI_CLASS_32:
                 dump = raw[off1 : off1 + 32]
                 log(f"2) 32 байта: {dump.hex(' ').upper()}")
@@ -1330,12 +1347,12 @@ def analyze_elf(file_path: str) -> None:
                 log("3) Поля Elf64_Phdr[1]:")
                 log(f"   p_type   = 0x{p_type:08X}  ({pt_name(p_type)})")
                 log(f"   p_flags  = 0x{p_flags:08X}")
-                log(f"   p_offset = 0x{p_offset:X}")
-                log(f"   p_vaddr  = 0x{p_vaddr:X}")
-                log(f"   p_paddr  = 0x{p_paddr:X}")
-                log(f"   p_filesz = 0x{p_filesz:X}")
-                log(f"   p_memsz  = 0x{p_memsz:X}")
-                log(f"   p_align  = 0x{p_align:X}")
+                log(f"   p_offset = {hxa(int(p_offset))}")
+                log(f"   p_vaddr  = {hxa(int(p_vaddr))}")
+                log(f"   p_paddr  = {hxa(int(p_paddr))}")
+                log(f"   p_filesz = {hxa(int(p_filesz))}")
+                log(f"   p_memsz  = {hxa(int(p_memsz))}")
+                log(f"   p_align  = {hxa(int(p_align))}")
             log(
                 "4) Разница p_filesz и p_memsz: p_filesz — сколько байт берётся из файла; "
                 "p_memsz — сколько байт выделяется в памяти сегмента. Если p_memsz > p_filesz, "
@@ -1343,7 +1360,7 @@ def analyze_elf(file_path: str) -> None:
                 "данные «без файла» занимают память, но не хранятся в образе)."
             )
             delta = int(ph1["p_memsz"]) - int(ph1["p_filesz"])
-            log(f"   Здесь: p_memsz - p_filesz = 0x{ph1['p_memsz']:X} - 0x{ph1['p_filesz']:X} = 0x{delta:X} ({delta} байт).")
+            log(f"   Здесь: p_memsz - p_filesz = {hxa(int(ph1['p_memsz']))} - {hxa(int(ph1['p_filesz']))} = {hxa(delta)} ({delta} байт).")
             nobits = [sh for sh in shdrs if sh["sh_type"] == SHT_NOBITS]
             log("5) Секции SHT_NOBITS и проверка sh_size = p_memsz − p_filesz для соответствующего LOAD:")
             found = False
@@ -1351,10 +1368,10 @@ def analyze_elf(file_path: str) -> None:
                 nm = sec_name(sh)
                 sz = int(sh["sh_size"])
                 if sz == delta and delta > 0:
-                    log(f"   Секция '{nm}' (SHT_NOBITS): sh_size = 0x{sz:X} — совпадает с разницей сегмента Phdr[1].")
+                    log(f"   Секция '{nm}' (SHT_NOBITS): sh_size = {hxa(sz)} — совпадает с разницей сегмента Phdr[1].")
                     found = True
                 elif delta > 0:
-                    log(f"   Секция '{nm}' (SHT_NOBITS): sh_size = 0x{sz:X}.")
+                    log(f"   Секция '{nm}' (SHT_NOBITS): sh_size = {hxa(sz)}.")
             if delta == 0:
                 log("   Для этого файла p_memsz == p_filesz у второго сегмента — расширения BSS в данном LOAD нет.")
             elif not found and nobits:
@@ -1372,7 +1389,7 @@ def analyze_elf(file_path: str) -> None:
             pv = int(first_load["p_vaddr"])
             pm = int(first_load["p_memsz"])
             end = pv + pm
-            log(f"Первый PT_LOAD: p_vaddr = 0x{pv:X}, p_memsz = 0x{pm:X}, конец VA = 0x{end:X}.")
+            log(f"Первый PT_LOAD: p_vaddr = {hxa(pv)}, p_memsz = {hxa(pm)}, конец VA = {hxa(end)}.")
             log("Условие включения секции: sh_addr >= p_vaddr  И  sh_addr + sh_size <= p_vaddr + p_memsz.")
             log()
             hdr_q3 = ("Индекс", "Имя секции", "sh_addr", "sh_addr+sh_size", "входит?")
@@ -1389,7 +1406,7 @@ def analyze_elf(file_path: str) -> None:
                 if sh["sh_type"] == SHT_NULL:
                     inside = False
                 mark = "да" if inside else "нет"
-                rows_q3.append((str(idx), nm, f"0x{sa:08X}", f"0x{ta:08X}", mark))
+                rows_q3.append((str(idx), nm, hxa(sa), hxa(ta), mark))
             log_markdown_table(log, hdr_q3, rows_q3)
         else:
             log("PT_LOAD не найден.")
@@ -1399,7 +1416,7 @@ def analyze_elf(file_path: str) -> None:
         log("Вопрос 4. p_flags всех PT_LOAD и выравнивание")
         log("-" * 80)
         for i, ph in enumerate(loads):
-            log(f"PT_LOAD[{i}] (глобальный PH[{ph['index']}]): p_flags = 0x{ph['p_flags']:X} → '{_ph_flags_str(ph['p_flags'])}'")
+            log(f"PT_LOAD[{i}] (глобальный PH[{ph['index']}]): p_flags = {_hx_u32(int(ph['p_flags']))} → '{_ph_flags_str(ph['p_flags'])}'")
             log(f"   Побитово: {_ph_flags_bits(ph['p_flags'])}")
         log(
             "Пояснение: у сегмента с кодом обычно выставлены R и X, но не W (защита от модификации кода). "
@@ -1410,7 +1427,7 @@ def analyze_elf(file_path: str) -> None:
         log()
         for ph in loads:
             pa = int(ph["p_align"])
-            log(f"Сегмент PH[{ph['index']}]: p_align = 0x{pa:X} ({pa} байт). "
+            log(f"Сегмент PH[{ph['index']}]: p_align = {hxa(pa)} ({pa} байт). "
                 f"Для загрузчика это требование выровнять начало сегмента в памяти по границе страницы/величине align.")
         log()
         for ph in loads:
@@ -1422,7 +1439,7 @@ def analyze_elf(file_path: str) -> None:
                 continue
             rem = (pv - po) % pa
             log(
-                f"PH[{ph['index']}]: (p_vaddr - p_offset) mod p_align = (0x{pv:X} - 0x{po:X}) mod 0x{pa:X} "
+                f"PH[{ph['index']}]: (p_vaddr - p_offset) mod p_align = ({hxa(pv)} - {hxa(po)}) mod {hxa(pa)} "
                 f"= {rem}  {'✓ условие выполнено' if rem == 0 else '✗ остаток ненулевой'}"
             )
         log()
@@ -1438,12 +1455,12 @@ def analyze_elf(file_path: str) -> None:
                 pm = int(ph["p_memsz"])
                 starts.append(pv)
                 ends.append(pv + pm)
-                log(f"Сегмент PH[{ph['index']}]: p_vaddr = 0x{pv:X}, p_memsz = 0x{pm:X}, виртуальный конец = 0x{pv + pm:X}")
+                log(f"Сегмент PH[{ph['index']}]: p_vaddr = {hxa(pv)}, p_memsz = {hxa(pm)}, виртуальный конец = {hxa(pv + pm)}")
             min_v = min(starts)
             max_e = max(ends)
             vm_total = max_e - min_v
-            log(f"Минимальный p_vaddr: 0x{min_v:X}; максимальный конец: 0x{max_e:X}.")
-            log(f"vm_total = max_end − min_vaddr = 0x{max_e:X} − 0x{min_v:X} = 0x{vm_total:X} ({vm_total} байт).")
+            log(f"Минимальный p_vaddr: {hxa(min_v)}; максимальный конец: {hxa(max_e)}.")
+            log(f"vm_total = max_end − min_vaddr = {hxa(max_e)} − {hxa(min_v)} = {hxa(vm_total)} ({vm_total} байт).")
             log(f"В килобайтах (десятичное): {vm_total / 1024:.4f} КиБ.")
             log(
                 "Смысл: это не «размер файла», а размах VA, который покрывают LOAD-сегменты при отображении в адресное пространство "
@@ -1454,7 +1471,7 @@ def analyze_elf(file_path: str) -> None:
             pv = int(ph["p_vaddr"])
             pm = int(ph["p_memsz"])
             vm_total = pm
-            log(f"Один PT_LOAD: диапазон 0x{pv:X} .. 0x{pv + pm:X}, vm_total = 0x{vm_total:X}.")
+            log(f"Один PT_LOAD: диапазон {hxa(pv)} .. {hxa(pv + pm)}, vm_total = {hxa(vm_total)}.")
         else:
             log("Нет PT_LOAD для расчёта.")
         log()
@@ -1467,7 +1484,7 @@ def analyze_elf(file_path: str) -> None:
 
 
 if __name__ == "__main__":
-    tgt = os.path.join(os.path.dirname(__file__), "student_20.elf")
+    tgt = os.path.join(os.path.dirname(__file__), "student_19.elf")
     if len(sys.argv) > 1:
         tgt = sys.argv[1]
     analyze_elf(tgt)
