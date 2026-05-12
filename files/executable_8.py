@@ -460,7 +460,7 @@ def analyze_pe(file_path):
 
 
 if __name__ == "__main__":
-    target_file = "variant_8.exe" 
+    target_file = "g1_s14.exe" 
     
     if len(sys.argv) > 1:
         target_file = sys.argv[1]
